@@ -1,0 +1,62 @@
+const KEY='nicks-archive-v2';
+const PORTABLE=window.PORTFOLIO_CONTENT||{};
+const starter={name:'Nick',heroTitle:'INNOVATION',heroRoles:'DEVELOPMENT · ACTING · LEADERSHIP · BUILDER · PERFORMER · LEADER',about:'',aboutImageName:'',aboutImageData:'',email:'',projects:[],socials:[]};
+const schema={projects:[['title','Project title','text'],['category','Area / medium','text'],['role','Your contribution','text'],['year','Year','text'],['description','Project description','textarea'],['learned','What I learned','textarea'],['imageName','Cover image filename','text'],['video','Video URL (.mp4)','text'],['url','Related link','text']],socials:[['label','Platform','text'],['url','Profile URL','text']]}
+let data=loadData();
+let adminUnlocked=false;
+function loadData(){try{let d=Object.assign({},starter,PORTABLE,JSON.parse(localStorage.getItem(KEY)||'{}'));delete d.achievements;delete d.goals;return d}catch(e){let d=Object.assign({},starter,PORTABLE);delete d.achievements;delete d.goals;return d}}
+function persist(){try{delete data.achievements;delete data.goals;localStorage.setItem(KEY,JSON.stringify(data));return true}catch(e){announce('Storage is full. Try a smaller image.',true);return false}}
+function esc(v){return String(v||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function imageSrc(item){return item.imageData||item.image||item.imageName||''}
+function announce(text,error){let n=document.getElementById('status');if(!n)return;n.textContent=text;n.classList.add('show');n.classList.toggle('error',!!error);setTimeout(()=>n.classList.remove('show'),2600)}
+function compressImage(file){return new Promise((resolve,reject)=>{let reader=new FileReader();reader.onerror=reject;reader.onload=()=>{let image=new Image();image.onerror=reject;image.onload=()=>{let scale=Math.min(1,1000/Math.max(image.width,image.height)),canvas=document.createElement('canvas');canvas.width=Math.round(image.width*scale);canvas.height=Math.round(image.height*scale);canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL('image/jpeg',.7))};image.src=reader.result};reader.readAsDataURL(file)})}
+function renderSite(){
+ document.title=(data.name||'Nick')+' — Portfolio';
+ document.getElementById('heroTitle').textContent=(data.heroTitle||'').toUpperCase();
+ document.getElementById('roles').textContent=(data.heroRoles||'').toUpperCase();
+ document.getElementById('aboutName').textContent=(data.name||'Nick').toUpperCase();
+ document.getElementById('aboutDescription').textContent=data.about||'';
+ let portrait=document.getElementById('portrait'),portraitSrc=data.aboutImageData||data.aboutImageName;portrait.src=portraitSrc||'';portrait.hidden=!portraitSrc;document.getElementById('portraitPlaceholder').hidden=!!portraitSrc;
+ let projects=data.projects||[];
+ document.getElementById('projectGrid').innerHTML=projects.map((p,i)=>{let src=imageSrc(p),video=p.video?'<video class="cardVideo" muted autoplay loop playsinline><source src="'+esc(p.video)+'"></video>':'',media=video||(src?'<img src="'+esc(src)+'" alt="">':'<div class="placeholder">'+String(i+1).padStart(2,'0')+'</div>');return '<button class="card" type="button" data-project-index="'+i+'">'+media+'<span class="overlay"><span class="title">'+esc(p.title||'Untitled project')+'</span><span class="category">'+esc(p.category||'PROJECT')+'</span><span class="arrow">↗</span></span></button>'}).join('');
+ document.querySelectorAll('[data-project-index]').forEach(card=>card.onclick=()=>{location.hash='project-'+card.dataset.projectIndex});
+ document.getElementById('emptyProjects').hidden=projects.length>0;
+
+ let mail=document.getElementById('contactEmail');mail.href=data.email?'mailto:'+esc(data.email):'#';mail.textContent=data.email?data.email+' ↗':'ADD YOUR EMAIL IN EDIT ↗';
+ document.getElementById('contactSocials').innerHTML=(data.socials||[]).map(s=>'<a href="'+esc(s.url)+'" target="_blank" rel="noreferrer">'+esc(s.label)+' ↗</a>').join('');
+}
+function renderProject(index){
+ let p=data.projects[index];if(!p){location.hash='home';return}
+ let gallery=(p.gallery||[]).map(g=>({src:g.data||g.src||'',name:g.name||''})).filter(g=>g.src),cover=imageSrc(p);if(cover)gallery.unshift({src:cover,name:p.imageName||'Cover'});
+ let mainImage=!p.video&&gallery.length?'<img id="detailImage" src="'+esc(gallery[0].src)+'" alt="'+esc(gallery[0].name||p.title)+'">':(!p.video?'<div class="detailPlaceholder">'+esc(p.category||'PROJECT')+'</div>':'');
+ let video=p.video?'<video class="detailVideo" controls playsinline'+(cover?' poster="'+esc(cover)+'"':'')+'><source src="'+esc(p.video)+'"></video>':'';
+ document.getElementById('projectDetail').innerHTML='<div class="detailTop"><div class="detailVisual">'+video+mainImage+'</div><div class="detailCopy"><small>'+esc(p.category||'PROJECT')+(p.year?' · '+esc(p.year):'')+'</small><h1>'+esc(p.title||'Untitled project')+'</h1>'+(p.role?'<h2>'+esc(p.role)+'</h2>':'')+'<p>'+esc(p.description||'Add a description in the portfolio editor.')+'</p>'+(p.learned?'<div class="learned"><small>PROCESS / REFLECTION</small><p>'+esc(p.learned)+'</p></div>':'')+(p.url?'<a class="detailLink" href="'+esc(p.url)+'" target="_blank" rel="noreferrer">RELATED LINK ↗</a>':'')+'</div></div>'+(gallery.length>1?'<div class="galleryStrip"><small>MORE IMAGES</small><div>'+gallery.map((g,i)=>'<button class="galleryThumb" data-gallery-index="'+i+'" aria-label="Show image '+(i+1)+'"><img src="'+esc(g.src)+'" alt="'+esc(g.name)+'"></button>').join('')+'</div></div>':'');
+ document.querySelectorAll('.galleryThumb').forEach(b=>b.onclick=()=>{let visual=document.querySelector('.detailVisual'),image=document.getElementById('detailImage');if(!image){visual.querySelector('video')?.remove();image=document.createElement('img');image.id='detailImage';visual.appendChild(image)}image.src=gallery[Number(b.dataset.galleryIndex)].src;image.alt=gallery[Number(b.dataset.galleryIndex)].name||p.title;document.querySelectorAll('.galleryThumb').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+}
+function readSettings(){document.querySelectorAll('[data-setting]').forEach(x=>data[x.dataset.setting]=x.value)}
+function saveChosenImage(file,record,filenameInput,label,preview){if(!file)return;record.imageName=file.name;label.textContent='Selected: '+file.name;compressImage(file).then(value=>{record.imageData=value;persist();filenameInput.value=file.name;preview.src=value;preview.hidden=false;renderSite()}).catch(()=>announce('Could not read that image.',true))}
+function draw(key){
+ let host=document.getElementById(key+'Editor'),rows=data[key]||[],withImages=key==='projects';
+ host.innerHTML=rows.length?rows.map((r,i)=>'<div class="entry" data-i="'+i+'"><button class="remove" type="button" aria-label="Remove">×</button>'+schema[key].map(f=>'<label class="'+(f[2]==='textarea'?'wide':'')+'">'+f[1]+(f[2]==='textarea'?'<textarea data-field="'+f[0]+'" rows="3">'+esc(r[f[0]])+'</textarea>':'<input data-field="'+f[0]+'" value="'+esc(r[f[0]])+'">')+'</label>').join('')+(withImages?'<label class="picker wide">CHOOSE COVER PHOTO<input type="file" class="entryFile" accept="image/*"><span class="fileName">'+(r.imageName?'Selected: '+esc(r.imageName):'Choose from your files')+'</span><img class="entryPreview" src="'+esc(imageSrc(r))+'" alt="" '+(imageSrc(r)?'':'hidden')+'></label>':'')+(key==='projects'?'<div class="galleryEdit wide"><label class="picker">ADD MORE PHOTOS<input type="file" class="galleryFile" accept="image/*" multiple></label><div class="galleryEditThumbs">'+(r.gallery||[]).map((g,j)=>'<div><img src="'+esc(g.data||g.src||'')+'" alt=""><button type="button" class="removeGallery" data-gallery-remove="'+j+'">REMOVE</button></div>').join('')+'</div></div>':'')+'</div>').join(''):'<p class="empty">Nothing added yet.</p>';
+ host.querySelectorAll('.entry').forEach(card=>{let i=Number(card.dataset.i);card.querySelector('.remove').onclick=()=>{readSettings();data[key].splice(i,1);persist();draw(key)};card.querySelectorAll('[data-field]').forEach(input=>input.oninput=()=>{data[key][i][input.dataset.field]=input.value;if(input.dataset.field==='imageName')data[key][i].imageData='';persist()});
+ let coverInput=card.querySelector('.entryFile');if(coverInput)coverInput.onchange=e=>saveChosenImage(e.target.files[0],data[key][i],card.querySelector('[data-field="imageName"]'),card.querySelector('.fileName'),card.querySelector('.entryPreview'));
+ let galleryInput=card.querySelector('.galleryFile');if(galleryInput)galleryInput.onchange=async e=>{let files=Array.from(e.target.files||[]);try{let newPhotos=await Promise.all(files.map(async file=>({name:file.name,data:await compressImage(file)})));data[key][i].gallery=(data[key][i].gallery||[]).concat(newPhotos);persist();draw(key);renderSite()}catch(err){announce('Could not add those images. Try smaller files.',true)}};
+ card.querySelectorAll('[data-gallery-remove]').forEach(b=>b.onclick=()=>{data[key][i].gallery.splice(Number(b.dataset.galleryRemove),1);persist();draw(key)});
+ });
+}
+function updateAboutFile(file){if(!file)return;compressImage(file).then(value=>{data.aboutImageName=file.name;data.aboutImageData=value;persist();document.getElementById('aboutImageName').value=file.name;document.getElementById('aboutFileName').textContent='Selected: '+file.name;let p=document.getElementById('aboutPreview');p.src=value;p.hidden=false;renderSite()}).catch(()=>announce('Could not read that image.',true))}
+function admin(){
+ document.querySelectorAll('[data-setting]').forEach(x=>x.value=data[x.dataset.setting]||'');
+ document.getElementById('aboutFileName').textContent=data.aboutImageName?'Selected: '+data.aboutImageName:'';
+ let preview=document.getElementById('aboutPreview');preview.src=data.aboutImageData||data.aboutImageName||'';preview.hidden=!preview.src;
+ document.getElementById('aboutPhotoFile').onchange=e=>updateAboutFile(e.target.files[0]);
+ document.getElementById('removeAboutPhoto').onclick=()=>{data.aboutImageName='';data.aboutImageData='';persist();preview.removeAttribute('src');preview.hidden=true;document.getElementById('aboutFileName').textContent='';document.getElementById('aboutImageName').value='';renderSite()};
+ document.getElementById('aboutImageName').oninput=e=>{data.aboutImageName=e.target.value;data.aboutImageData='';persist();preview.src=e.target.value;preview.hidden=!e.target.value;renderSite()};
+ Object.keys(schema).forEach(draw);
+ document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{readSettings();let k=b.dataset.add;data[k].push(Object.fromEntries(schema[k].map(f=>[f[0],''])));persist();draw(k)});
+ document.getElementById('save').onclick=()=>{readSettings();persist();renderSite();announce('SAVED')};
+ document.getElementById('exportSite').onclick=()=>{readSettings();persist();let fileText='window.PORTFOLIO_CONTENT = '+JSON.stringify(data,null,2)+';\n';let blob=new Blob([fileText],{type:'text/javascript'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='portfolio-content.js';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);announce('PORTABLE CONTENT DOWNLOADED')};
+}
+function unlockAdmin(){let form=document.getElementById('adminGateForm');form.onsubmit=e=>{e.preventDefault();let ok=document.getElementById('adminCode').value==='1357';document.getElementById('adminGateError').hidden=ok;if(ok){adminUnlocked=true;route()}}}
+function route(){let hash=location.hash||'#home',isAdmin=hash==='#admin',projectMatch=hash.match(/^#project-(\d+)$/),projectPage=!!projectMatch;document.getElementById('siteHeader').hidden=isAdmin;document.getElementById('homePage').hidden=isAdmin||projectPage||hash!=='#home';document.getElementById('aboutPage').hidden=isAdmin||projectPage||hash!=='#about';document.getElementById('contactPage').hidden=isAdmin||projectPage||hash!=='#contact';document.getElementById('projectPage').hidden=!projectPage;if(!isAdmin)adminUnlocked=false;document.getElementById('adminPage').hidden=!isAdmin;if(isAdmin){let unlocked=adminUnlocked;document.getElementById('adminGate').hidden=unlocked;document.getElementById('adminContent').hidden=!unlocked;if(unlocked)admin();else unlockAdmin()}if(projectPage)renderProject(Number(projectMatch[1]))}
+renderSite();route();window.addEventListener('hashchange',route);
